@@ -1239,7 +1239,17 @@ async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
   infoVal(16,89,supStr[0]||'—',8);
 
   infoLabel(100,83,'LEVEL PROGRESSION');
-  infoVal(100,89,`${levelFrom}  →  ${levelTo}`,9);
+  // Draw the progression arrow manually so it renders clearly in every PDF viewer.
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(19,34,49);
+  doc.text(String(levelFrom),100,89);
+  doc.setDrawColor(19,34,49);
+  doc.setFillColor(19,34,49);
+  doc.setLineWidth(0.45);
+  doc.line(115,88.4,132,88.4);
+  doc.triangle(132,86.8,132,90,136,88.4,'F');
+  doc.text(String(levelTo),141,89);
 
   // Last training date. Filter information is intentionally hidden in the PDF certificate.
   doc.setFillColor(241,245,247);
