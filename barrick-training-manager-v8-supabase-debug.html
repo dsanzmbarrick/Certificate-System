@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barrick Academy – Training Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F7F6;--surf:#FFFFFF;--surf2:#F1F5F7;--surf3:#E7EDF1;
+  --border:rgba(19,34,49,0.10);--border2:rgba(19,34,49,0.18);
+  --text:#132231;--muted:#656565;--muted2:#979797;
+  --gold:#A39161;--gold2:#8D7A4F;--goldBg:rgba(163,145,97,0.18);
+  --red:#C62325;--redBg:rgba(198,35,37,0.08);
+  --orange:#D4644B;--orangeBg:rgba(212,100,75,0.12);
+  --green:#51857A;--greenBg:rgba(81,133,122,0.11);
+  --teal:#738CB4;--tealBg:rgba(115,140,180,0.12);
+  --blue:#00557E;--blueBg:rgba(0,85,126,0.11);
+  --r:8px;--r2:12px;--r3:16px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#F6F7F6 0%,#EAF1F4 100%);color:var(--text);font-size:14px;min-height:100vh;}
+
+/* LOGIN */
+#loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#F6F7F6 0%,#E6EEF2 55%,#DCE8EE 100%);}
+.lCard{background:var(--surf);border:1px solid var(--border2);border-radius:var(--r3);
+  padding:42px 38px;width:400px;box-shadow:0 24px 60px rgba(19,34,49,0.12);}
+.lLogo{display:flex;align-items:center;gap:14px;margin-bottom:28px;padding-bottom:22px;border-bottom:1px solid var(--border);}
+.lLogo img{width:58px;height:auto;}
+.lLogoTxt strong{font-size:16px;font-weight:700;color:var(--text);display:block;line-height:1.3;}
+.lLogoTxt span{font-size:11px;color:var(--muted);letter-spacing:0.3px;}
+.lCard label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;display:block;margin-bottom:6px;}
+.lCard input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);
+  padding:10px 13px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;margin-bottom:14px;transition:border-color .2s;}
+.lCard input:focus{border-color:var(--blue);}
+.lBtn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--r);padding:11px;
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.3px;transition:.2s;}
+.lBtn:hover{background:#00476A;}
+.lErr{color:var(--red);font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh;}
+
+/* TOPBAR */
+.topbar{background:rgba(255,255,255,0.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);height:58px;
+  padding:0 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.tbLeft{display:flex;align-items:center;gap:10px;}
+.tbLogo img{height:34px;width:auto;}
+.tbDiv{width:1px;height:22px;background:var(--border2);}
+.tbTitle{font-size:12px;font-weight:500;color:var(--muted);}
+.tbRight{display:flex;align-items:center;gap:10px;}
+.uPill{display:flex;align-items:center;gap:7px;background:var(--surf2);border:1px solid var(--border);
+  border-radius:999px;padding:4px 13px 4px 5px;font-size:12px;}
+.uAv{width:24px;height:24px;border-radius:50%;background:var(--blue);display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:700;color:#fff;}
+.uRole{font-size:10px;color:var(--muted);margin-left:1px;}
+.tbTabs{display:flex;gap:2px;margin-left:14px;}
+.tbTab{padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);
+  border-radius:var(--r);transition:.15s;}
+.tbTab:hover{color:var(--text);background:var(--surf2);}
+.tbTab.active{color:var(--blue);background:var(--blueBg);}
+.logoutBtn{background:none;border:1px solid var(--border2);border-radius:var(--r);
+  color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;padding:5px 12px;cursor:pointer;transition:.2s;}
+.logoutBtn:hover{border-color:var(--red);color:var(--red);}
+
+/* PANES */
+.pane{display:none;}.pane.active{display:block;}
+.main{padding:24px 22px;max-width:1400px;margin:0 auto;width:100%;}
+
+/* STATS */
+.statsRow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
+.sCard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r2);padding:15px 17px;}
+.sLbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:4px;}
+.sVal{font-size:22px;font-weight:600;letter-spacing:-0.5px;}
+.sVal.gold{color:var(--gold);}.sVal.green{color:var(--green);}
+.sVal.orange{color:var(--orange);}.sVal.red{color:var(--red);}.sVal.teal{color:var(--teal);}
+
+/* LEGEND */
+.legend{display:flex;gap:16px;align-items:center;padding:9px 14px;background:var(--surf2);
+  border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px;flex-wrap:wrap;}
+.legTitle{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.legItem{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.legDot{width:9px;height:9px;border-radius:2px;}
+.legDot.red{background:var(--redBg);border:1px solid var(--red);}
+.legDot.orange{background:var(--orangeBg);border:1px solid var(--orange);}
+.legDot.green{background:var(--greenBg);border:1px solid var(--green);}
+.legDot.teal{background:var(--tealBg);border:1px solid var(--teal);}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:9px;margin-bottom:13px;flex-wrap:wrap;}
+.sWrap{flex:1;min-width:200px;position:relative;}
+.sWrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.sInput{width:100%;background:var(--surf);border:1px solid var(--border2);border-radius:var(--r);
+  padding:8px 12px 8px 33px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:.2s;}
+.sInput:focus{border-color:var(--blue);}
+.fSel{background:var(--surf);border:1px solid var(--border2);border-radius:var(--r);
+  padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;cursor:pointer;}
+.btnG{background:var(--blue);color:#fff;border:none;border-radius:var(--r);padding:8px 15px;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;transition:.2s;}
+.btnG:hover{background:#00476A;}
+.btnO{background:none;color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:8px 15px;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;transition:.2s;}
+.btnO:hover{border-color:var(--blue);color:var(--blue);}
+
+/* TABLE */
+.tWrap{background:var(--surf);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--surf2);padding:9px 13px;text-align:left;font-size:10px;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--border);white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);transition:filter .12s;cursor:pointer;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover td{filter:brightness(0.98);}
+tbody tr.rRed{background:var(--redBg);}
+tbody tr.rOrange{background:var(--orangeBg);}
+tbody tr.rGreen{background:var(--greenBg);}
+tbody tr.rTeal{background:var(--tealBg);}
+tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;}
+.badge.comp{background:var(--greenBg);color:var(--green);}
+.badge.expir{background:var(--orangeBg);color:var(--orange);}
+.badge.expd{background:var(--redBg);color:var(--red);}
+.badge.prog{background:var(--tealBg);color:var(--teal);}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;}
+.pagBar{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 13px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+.pagBtns{display:flex;gap:6px;}
+.pagBtn{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text);
+  padding:4px 11px;font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;}
+.pagBtn:disabled{opacity:.3;cursor:default;}
+.empty{padding:48px 20px;text-align:center;color:var(--muted);font-size:13px;}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:300;
+  align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surf);border:1px solid var(--border2);border-radius:var(--r3);
+  padding:26px;width:560px;max-width:96vw;max-height:90vh;overflow-y:auto;position:relative;}
+.mTitle{font-size:16px;font-weight:600;margin-bottom:3px;}
+.mSub{color:var(--muted);font-size:12px;margin-bottom:20px;}
+.mClose{position:absolute;right:14px;top:13px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+.iGrid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:18px;}
+.iItem label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:3px;}
+.iItem span{font-size:13px;font-weight:500;}
+.fGroup{margin-bottom:13px;}
+.fGroup label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;}
+.fGroup input,.fGroup select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);
+  padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:.2s;}
+.fGroup input:focus,.fGroup select:focus{border-color:var(--blue);}
+.fRow{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+
+/* ADMIN */
+.adminGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.aCard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r2);padding:20px;}
+.aCardTitle{font-size:13px;font-weight:600;margin-bottom:14px;}
+.uTbl{width:100%;border-collapse:collapse;}
+.uTbl th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;
+  padding:6px 9px;text-align:left;border-bottom:1px solid var(--border);}
+.uTbl td{padding:8px 9px;font-size:12px;border-bottom:1px solid var(--border);}
+.uTbl tr:last-child td{border-bottom:none;}
+.delBtn{background:none;border:1px solid var(--border2);border-radius:4px;
+  color:var(--red);font-size:10px;padding:2px 7px;cursor:pointer;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surf);border:1px solid var(--border2);
+  border-radius:var(--r);padding:10px 17px;font-size:12px;z-index:9999;
+  transform:translateY(40px);opacity:0;transition:.3s;max-width:280px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.ok{border-color:var(--green);color:var(--green);}
+.toast.err{border-color:var(--red);color:var(--red);}
+.toast.inf{border-color:var(--gold);color:var(--gold);}
+
+@media(max-width:700px){
+  .statsRow{grid-template-columns:repeat(2,1fr);}
+  .adminGrid{grid-template-columns:1fr;}
+  .main{padding:14px 10px;}
+  .topbar{padding:0 10px;}
+  .tbTitle{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+<div class="lCard">
+  <div class="lLogo">
+    <img src="https://raw.githubusercontent.com/dsanzmbarrick/LOGOS/ccfc3bc968f8ae4350676a9f6bd41f4ae79dd6e2/Logo%20Barrick%20Ac2.png" alt="Barrick Academy">
+    <div class="lLogoTxt">
+      <strong>Training Manager</strong>
+      <span>Employee Certificate System</span>
+    </div>
+  </div>
+  <label>Correo</label>
+  <input type="email" id="lu" placeholder="correo@barrick.com" autocomplete="username">
+  <label>Contraseña</label>
+  <input type="password" id="lp" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+  <button class="lBtn" onclick="login()">Ingresar</button>
+  <div class="lErr" id="le"></div>
+</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <nav class="topbar">
+    <div class="tbLeft">
+      <div class="tbLogo"><img src="https://raw.githubusercontent.com/dsanzmbarrick/LOGOS/ccfc3bc968f8ae4350676a9f6bd41f4ae79dd6e2/Logo%20Barrick%20Ac2.png" alt="Barrick Academy"></div>
+      <div class="tbDiv"></div>
+      <div class="tbTitle">Training Certificate Manager</div>
+      <div class="tbTabs">
+        <div class="tbTab active" onclick="switchPane('employees')">Empleados</div>
+        <div class="tbTab admin-tab" id="adminTabBtn" onclick="switchPane('admin')" style="display:none">Admin</div>
+      </div>
+    </div>
+    <div class="tbRight">
+      <div class="uPill">
+        <div class="uAv" id="tAv">--</div>
+        <span id="tName">—</span>
+        <span class="uRole" id="tRole"></span>
+      </div>
+      <button class="logoutBtn" onclick="logout()">Salir</button>
+    </div>
+  </nav>
+
+  <!-- EMPLOYEES PANE -->
+  <div class="pane active" id="pane-employees">
+  <div class="main">
+    <div class="statsRow">
+      <div class="sCard"><div class="sLbl">Total Registros</div><div class="sVal gold" id="stTotal">0</div></div>
+      <div class="sCard"><div class="sLbl">Competentes</div><div class="sVal green" id="stComp">0</div></div>
+      <div class="sCard"><div class="sLbl">Expiring Soon</div><div class="sVal orange" id="stExpir">0</div></div>
+      <div class="sCard"><div class="sLbl">Expirados</div><div class="sVal red" id="stExpd">0</div></div>
+      <div class="sCard"><div class="sLbl">In Progress</div><div class="sVal teal" id="stProg">0</div></div>
+    </div>
+
+    <div class="legend">
+      <span class="legTitle">Leyenda:</span>
+      <div class="legItem"><div class="legDot red"></div>Expirado — requiere renovación inmediata</div>
+      <div class="legItem"><div class="legDot orange"></div>Expiring Soon — vence pronto</div>
+      <div class="legItem"><div class="legDot green"></div>Competente y Válido</div>
+      <div class="legItem"><div class="legDot teal"></div>In Progress — en curso</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="sWrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="sInput" id="empQ" type="text" placeholder="Buscar por ID o nombre del empleado..." oninput="applyFilter()">
+      </div>
+      <select class="fSel" id="empSF" onchange="applyFilter()">
+        <option value="">Todos los estados</option>
+        <option value="comp">Competente</option>
+        <option value="expir">Expiring Soon</option>
+        <option value="expd">Expirado</option>
+        <option value="prog">In Progress</option>
+      </select>
+      <button class="btnG" id="multiBtn" style="display:none" onclick="openMultiCert()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Generar seleccionados (<span id="selCnt">0</span>)
+      </button>
+      <button class="btnO" onclick="selectAllFiltered()">Seleccionar todo filtrado</button>
+      <button class="btnO" id="clearSelBtn" style="display:none" onclick="clearSelection()">Limpiar selección</button>
+      <button class="btnG" id="downloadAllBtn" onclick="openAllCert()">Descargar todo filtrado</button>
+    </div>
+
+    <div class="tWrap">
+      <table>
+        <thead><tr>
+          <th style="width:34px"><input type="checkbox" id="chkAll" onchange="toggleAll(this)" style="accent-color:var(--gold)"></th>
+          <th>ID</th><th>Empleado</th><th>Skill Code</th><th>Skill Name</th>
+          <th>Date From</th><th>Date To</th><th>Supervisor</th><th>Estado</th><th></th>
+        </tr></thead>
+        <tbody id="empBody"></tbody>
+      </table>
+      <div class="pagBar">
+        <span id="pagInfo">0 registros</span>
+        <div class="pagBtns">
+          <button class="pagBtn" id="bPrev" onclick="goPage(-1)" disabled>Prev</button>
+          <button class="pagBtn" id="bNext" onclick="goPage(1)" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ADMIN PANE -->
+  <div class="pane" id="pane-admin">
+  <div class="main">
+    <h2 style="font-size:15px;font-weight:600;margin-bottom:18px;">Panel de Administración</h2>
+    <div class="adminGrid">
+      <div class="aCard">
+        <div class="aCardTitle">Base de datos Supabase</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+          La base real vive en Supabase. El usuario Training solo consulta y genera certificados. Solo Admin puede reemplazar la base desde Excel/CSV.
+        </div>
+        <div id="dbStatus" style="font-size:12px;color:var(--text);background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;margin-bottom:12px;">Base: sin cargar</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btnG" id="refreshSbBtn" type="button" onclick="loadSupabaseData(false,this)">Actualizar desde Supabase</button>
+          <button class="btnO" onclick="document.getElementById('csvFile').click()">Reemplazar base con Excel/CSV</button>
+          <button class="btnO" onclick="downloadCurrentJson()">Exportar JSON actual</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;">
+          Importante: esta acción reemplaza completamente la tabla training_records. Los usuarios y perfiles no se borran.
+        </div>
+        <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="importFile(event)">
+      </div>
+      <div class="aCard">
+        <div class="aCardTitle">Usuarios del Sistema</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+          Los usuarios y contraseñas ya no viven en GitHub. Se crean en Supabase Authentication y el rol se controla en la tabla profiles.
+        </div>
+        <table class="uTbl" id="uTbl"></table>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;">
+          Para agregar usuarios: Authentication &gt; Users &gt; Add user, luego insertar o actualizar su perfil en public.profiles.
+        </div>
+      </div>
+      <div class="aCard">
+        <div class="aCardTitle">Estadísticas</div>
+        <div id="adminStats" style="font-size:13px;color:var(--muted);line-height:2.3;"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="overlay" id="detModal">
+<div class="modal" style="width:620px">
+  <button class="mClose" onclick="close2('detModal')">×</button>
+  <div class="mTitle" id="dmName">—</div>
+  <div class="mSub" id="dmSub">—</div>
+  <div class="iGrid" id="dmGrid"></div>
+  <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Otras competencias del empleado</div>
+    <div id="dmOtherSkills" style="max-height:200px;overflow-y:auto;"></div>
+  </div>
+  <button class="btnG" style="width:100%;justify-content:center;margin-top:14px;" onclick="openCertFromDetail()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Generar Certificado PDF
+  </button>
+</div>
+</div>
+
+<!-- CERT CONFIG MODAL -->
+<div class="overlay" id="certModal">
+<div class="modal" style="width:460px">
+  <button class="mClose" onclick="close2('certModal')">×</button>
+  <div class="mTitle">Configurar Certificado</div>
+  <div class="mSub" id="certSub">—</div>
+  <div class="fRow">
+    <div class="fGroup"><label>Level From (actual)</label><input type="text" id="cLF" placeholder="Ej: 3B"></div>
+    <div class="fGroup"><label>Level To (destino)</label><input type="text" id="cLT" placeholder="Ej: 2"></div>
+  </div>
+  <div class="fGroup">
+    <label>Competencias a incluir</label>
+    <select id="cFilt">
+      <option value="all">Todas</option>
+      <option value="comp">Solo Competentes (Valid)</option>
+      <option value="compExpir">Competentes + Expiring Soon</option>
+    </select>
+  </div>
+  <button class="btnG" style="width:100%;justify-content:center;margin-top:6px;" onclick="doCert()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Descargar PDF
+  </button>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════
+//  LOGOS
+// ══════════════════════════════
+const LOGO_WHITE_URL = 'https://raw.githubusercontent.com/dsanzmbarrick/barrickacademy-calendar/86b5c1d6ba69c9a79118ae77103fa8bed93c3d1a/AAALogo%20Barrick%20Ac2.png'; // letras blancas para fondos oscuros
+const LOGO_BLUE_URL  = 'https://raw.githubusercontent.com/dsanzmbarrick/LOGOS/ccfc3bc968f8ae4350676a9f6bd41f4ae79dd6e2/Logo%20Barrick%20Ac2.png';  // letras azules para fondos claros
+const LOGO_CACHE = {};
+
+// Supabase configuration. Project URL must be base URL, not /rest/v1.
+const SUPABASE_URL = 'https://leitdxtujmilletjbnsu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_-xTqudV_2kPfAyqkRUWJtA_qqo0lV1P';
+const SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let LAST_SOURCE = 'Supabase';
+let LAST_LOAD_AT = '';
+let PROFILES = [];
+
+function logoToDataURL(url){
+  if(!url) return Promise.resolve(null);
+  if(LOGO_CACHE[url]) return LOGO_CACHE[url];
+  LOGO_CACHE[url] = fetch(url,{mode:'cors'})
+    .then(r=>{ if(!r.ok) throw new Error('No se pudo cargar el logo'); return r.blob(); })
+    .then(blob=>new Promise((resolve,reject)=>{
+      const fr=new FileReader();
+      fr.onload=()=>resolve(fr.result);
+      fr.onerror=reject;
+      fr.readAsDataURL(blob);
+    }))
+    .catch(err=>{ console.warn('Logo no disponible:',err); return null; });
+  return LOGO_CACHE[url];
+}
+
+// ══════════════════════════════
+//  SESSION / AUTH
+// ══════════════════════════════
+let CU = null; // current user/profile
+
+// ══════════════════════════════
+//  DATA STATE
+// ══════════════════════════════
+let ALL  = [];   // deduped rows with _status
+let FILT = [];   // after filter
+let SEL  = new Set();
+let PAGE = 1;
+const PER = 12;
+let detailEmpId = null; // for cert generation from detail modal
+
+async function getProfile(userId){
+  const {data,error} = await SB
+    .from('profiles')
+    .select('id, full_name, role, active')
+    .eq('id', userId)
+    .maybeSingle();
+  if(error) throw error;
+  if(!data || data.active !== true) throw new Error('Tu usuario no tiene perfil activo en Supabase.');
+  return data;
+}
+
+function showAppForUser(profile){
+  CU = {
+    id: profile.id,
+    name: profile.full_name || 'Usuario',
+    role: profile.role || 'training'
+  };
+  document.getElementById('le').textContent='';
+  document.getElementById('loginScreen').style.display='none';
+  const app=document.getElementById('app');
+  app.style.display='flex'; app.style.flexDirection='column';
+  const ini=CU.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('tAv').textContent=ini || '--';
+  document.getElementById('tName').textContent=CU.name;
+  document.getElementById('tRole').textContent=CU.role==='admin'?'| Admin':'| Training';
+  document.getElementById('adminTabBtn').style.display=CU.role==='admin'?'':'none';
+  switchPane('employees');
+  loadSupabaseData(true);
+}
+
+async function login(){
+  const email=document.getElementById('lu').value.trim();
+  const password=document.getElementById('lp').value;
+  if(!email || !password){document.getElementById('le').textContent='Escribe correo y contraseña.';return;}
+  document.getElementById('le').textContent='Validando acceso...';
+  const {data,error} = await SB.auth.signInWithPassword({email,password});
+  if(error){document.getElementById('le').textContent='Correo o contraseña incorrectos, o usuario no confirmado.';return;}
+  try{
+    const profile = await getProfile(data.user.id);
+    showAppForUser(profile);
+  }catch(err){
+    await SB.auth.signOut();
+    document.getElementById('le').textContent=err.message || 'No tienes perfil activo.';
+  }
+}
+
+async function logout(){
+  await SB.auth.signOut();
+  CU=null;
+  ALL=[]; FILT=[]; SEL.clear(); PAGE=1;
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('lu').value='';
+  document.getElementById('lp').value='';
+  document.getElementById('le').textContent='';
+}
+
+async function restoreSession(){
+  const {data} = await SB.auth.getSession();
+  if(data && data.session && data.session.user){
+    try{
+      const profile = await getProfile(data.session.user.id);
+      showAppForUser(profile);
+    }catch(err){
+      await SB.auth.signOut();
+    }
+  }
+}
+
+// ══════════════════════════════
+//  TABS
+// ══════════════════════════════
+function switchPane(p){
+  document.querySelectorAll('.tbTab').forEach(el=>{
+    el.classList.toggle('active',el.getAttribute('onclick').includes(p));
+  });
+  document.querySelectorAll('.pane').forEach(el=>el.classList.remove('active'));
+  document.getElementById('pane-'+p).classList.add('active');
+  if(p==='admin'){
+    updateDbStatus();
+    renderUserTable();renderAdminStats();
+  }
+}
+
+// ══════════════════════════════
+//  STATUS LOGIC
+// ══════════════════════════════
+function computeStatus(lvl,sts){
+  const l=(lvl||'').toString().trim().toLowerCase();
+  const s=(sts||'').toString().trim().toLowerCase();
+  // Expired
+  if(s==='expired'||l==='expired') return 'expd';
+  // In Progress
+  if(s==='in progress'||l==='not yet complete'||!l||l==='n/a') return 'prog';
+  // Expiring Soon
+  if(s.includes('expiring')&&(l==='competent'||l==='certified'||l==='completed')) return 'expir';
+  // Competent
+  if((l==='competent'||l==='certified'||l==='completed')&&s==='valid') return 'comp';
+  return 'comp';
+}
+
+const ST_LABEL={comp:'Competente',expir:'Expiring Soon',expd:'Expirado',prog:'In Progress'};
+const ST_CLASS={comp:'comp',expir:'expir',expd:'expd',prog:'prog'};
+const ROW_CLASS={comp:'rGreen',expir:'rOrange',expd:'rRed',prog:'rTeal'};
+
+function badge(s){
+  return `<span class="badge ${ST_CLASS[s]||'prog'}"><span class="dot"></span>${ST_LABEL[s]||s}</span>`;
+}
+
+// ══════════════════════════════
+//  PARSE + FORMAT DATE
+// ══════════════════════════════
+function isExcelSerialDate(v){
+  const raw=String(v??'').trim().replace(',', '.');
+  if(!/^\d{4,5}(\.\d+)?$/.test(raw)) return false;
+  const n=Number(raw);
+  return n>25000 && n<80000;
+}
+
+function pd(s){
+  if(s instanceof Date && !isNaN(s)) return s;
+  if(!s||String(s).trim()===''||String(s).toLowerCase()==='nan') return new Date(0);
+  if(isExcelSerialDate(s)){
+    const n=Number(String(s).trim().replace(',', '.'));
+    return new Date(Math.round((n-25569)*86400*1000));
+  }
+  const raw=String(s).trim();
+  const d=new Date(raw);
+  if(!isNaN(d)&&d.getFullYear()>1970) return d;
+  const mo={
+    jan:0,ene:0,feb:1,mar:2,apr:3,abr:3,may:4,jun:5,jul:6,aug:7,ago:7,
+    sep:8,sept:8,oct:9,nov:10,dec:11,dic:11
+  };
+  const m=raw.match(/(\d{1,2})[-\/\s]([a-zA-ZáéíóúÁÉÍÓÚ]+)[-\/\s](\d{2,4})/);
+  if(m){
+    const yr=parseInt(m[3],10);
+    const fy=yr<100?(yr<50?2000+yr:1900+yr):yr;
+    const mm=mo[m[2].toLowerCase().substring(0,4)] ?? mo[m[2].toLowerCase().substring(0,3)] ?? 0;
+    return new Date(fy,mm,parseInt(m[1],10));
+  }
+  const m2=raw.match(/(\w+)\s+(\d{1,2}),\s+(\d{4})/);
+  if(m2) return new Date(`${m2[1]} ${m2[2]}, ${m2[3]}`);
+  return new Date(0);
+}
+
+function fd(v){
+  const raw=String(v??'').trim();
+  if(!raw||raw.toLowerCase()==='nan') return '';
+  if(['n/a','na','no aplica','none'].includes(raw.toLowerCase())) return 'n/a';
+  const d=pd(v);
+  if(!d||isNaN(d)||d.getFullYear()<=1970) return raw;
+  const months=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const dd=String(d.getDate()).padStart(2,'0');
+  return `${dd}-${months[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+// ══════════════════════════════
+//  IMPORT / SUPABASE DATABASE
+// ══════════════════════════════
+function normalizeRawRows(raw){
+  if(!raw || !raw.length) return [];
+
+  const aliases={
+    'Employee Element ID':['employee element id','employee_id','id','employee id','emp id','employeeid'],
+    'Employee':['employee','employee_name','nombre','name','full name','employee name','empleado'],
+    'Skill Code':['skill code','skill_code','skillcode','code','codigo','course code'],
+    'Skill Name':['skill name','skill_name','skillname','nombre curso','course','curso','course name'],
+    'Status':['status','estado','competence status'],
+    'Level':['level','nivel','competence','competencia','level/grade'],
+    'Date From':['date from','date_from','fecha','date','completion date','datefrom','fecha realizacion','date completed'],
+    'Date To':['date to','date_to','expiry','expiration','vencimiento','dateto','fecha vencimiento','expiry date'],
+    'Supervisor':['supervisor','superv','manager','jefe']
+  };
+  const hdrs=Object.keys(raw[0]);
+  function fc(als){return hdrs.find(h=>als.includes(h.toLowerCase().trim()))||null;}
+  const cm={};
+  for(const[k,a] of Object.entries(aliases)) cm[k]=fc(a);
+
+  const required=['Employee Element ID','Employee','Skill Code','Skill Name'];
+  const missing=required.filter(k=>!cm[k]);
+  if(missing.length){
+    console.warn('Headers encontrados:',hdrs);
+    throw new Error('Faltan columnas base: '+missing.join(', '));
+  }
+
+  const norm=raw.map(r2=>({
+    id:  cm['Employee Element ID']?String(r2[cm['Employee Element ID']]).trim():'',
+    emp: cm['Employee']?String(r2[cm['Employee']]||'').trim():'Sin nombre',
+    sc:  cm['Skill Code']?String(r2[cm['Skill Code']]||'').trim():'',
+    sn:  cm['Skill Name']?String(r2[cm['Skill Name']]||'').trim():'',
+    sts: cm['Status']?String(r2[cm['Status']]||'').trim():'',
+    lvl: cm['Level']?String(r2[cm['Level']]||'').trim():'',
+    df:  cm['Date From']?fd(r2[cm['Date From']]):'',
+    dt:  cm['Date To']?fd(r2[cm['Date To']]):'',
+    sup: cm['Supervisor']?String(r2[cm['Supervisor']]||'').trim():''
+  })).filter(r=>r.id || r.emp || r.sc || r.sn);
+
+  const best={};
+  norm.forEach(r2=>{
+    const k=r2.id+'||'+r2.sc;
+    if(!best[k]){best[k]=r2;return;}
+    if(pd(r2.df)>pd(best[k].df)) best[k]=r2;
+  });
+  return Object.values(best);
+}
+
+function processRawRows(raw, sourceLabel){
+  try{
+    const norm = normalizeRawRows(raw);
+    ALL=norm.map(r2=>({...r2,_s:computeStatus(r2.lvl,r2.sts)}));
+    FILT=[...ALL]; PAGE=1; SEL.clear();
+    LAST_SOURCE=sourceLabel||'Supabase';
+    LAST_LOAD_AT=new Date().toLocaleString('es-DO',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'});
+    updateDbStatus();
+    render(); renderAdminStats();
+    toast(`✓ ${ALL.length} registros cargados (${raw.length-ALL.length} duplicados removidos)`,'ok');
+    return true;
+  }catch(err){
+    toast(err.message || 'No se pudo procesar la base','err');
+    return false;
+  }
+}
+
+function uiFromDbRow(r){
+  return {
+    id:String(r.employee_id||''),
+    emp:r.employee_name||'Sin nombre',
+    sc:r.skill_code||'',
+    sn:r.skill_name||'',
+    sts:r.status||'',
+    lvl:r.level||'',
+    df:fd(r.date_from||''),
+    dt:fd(r.date_to||''),
+    sup:r.supervisor||'',
+    _s:computeStatus(r.level,r.status)
+  };
+}
+
+async function loadSupabaseData(silent=false, btn=null){
+  if(!CU){
+    toast('No hay sesión activa. Cierra e inicia sesión otra vez.','err');
+    const el=document.getElementById('dbStatus');
+    if(el) el.textContent='Error: no hay sesión activa.';
+    return false;
+  }
+
+  const statusEl=document.getElementById('dbStatus');
+  if(statusEl) statusEl.textContent='Base: cargando desde Supabase...';
+  if(btn){ btn.disabled=true; btn.dataset.oldText=btn.textContent; btn.textContent='Cargando...'; }
+  if(!silent) toast('Cargando base desde Supabase...','inf');
+
+  try{
+    const pageSize=1000;
+    let from=0;
+    let rows=[];
+    while(true){
+      const {data,error} = await SB
+        .from('training_records')
+        .select('id, employee_id, employee_name, supervisor, skill_code, skill_name, date_from, date_to, status, level, created_at')
+        .order('id',{ascending:true})
+        .range(from, from+pageSize-1);
+      if(error) throw error;
+      rows = rows.concat(data || []);
+      if(!data || data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    ALL=rows.map(uiFromDbRow);
+    FILT=[...ALL]; PAGE=1; SEL.clear();
+    LAST_SOURCE='Supabase / training_records';
+    LAST_LOAD_AT=new Date().toLocaleString('es-DO',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'});
+    updateDbStatus();
+    applyFilter();
+    renderAdminStats();
+    console.log('Supabase loaded rows:', ALL.length);
+    if(!silent) toast(`✓ ${ALL.length} registros leídos desde Supabase`,'ok');
+    return true;
+  }catch(err){
+    console.error('Supabase load error:',err);
+    const msg = err && err.message ? err.message : String(err);
+    if(statusEl) statusEl.textContent='Error al leer Supabase: '+msg;
+    toast('Error Supabase: '+msg,'err');
+    applyFilter();
+    return false;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.oldText || 'Actualizar desde Supabase'; }
+  }
+}
+
+function updateDbStatus(){
+  const el=document.getElementById('dbStatus');
+  if(!el) return;
+  const total = ALL.length ? ` | ${ALL.length} registros` : '';
+  el.textContent = `Base: ${LAST_SOURCE}${LAST_LOAD_AT ? ' | '+LAST_LOAD_AT : ''}${total}`;
+}
+
+async function replaceSupabaseRecordsFromRaw(raw, sourceLabel){
+  if(!CU || CU.role!=='admin') throw new Error('Solo Admin puede reemplazar la base.');
+  const norm = normalizeRawRows(raw);
+  if(!norm.length) throw new Error('El archivo no tiene filas válidas.');
+
+  const dbRows = norm.map(r=>({
+    employee_id:r.id,
+    employee_name:r.emp,
+    supervisor:r.sup,
+    skill_code:r.sc,
+    skill_name:r.sn,
+    date_from:r.df,
+    date_to:r.dt,
+    status:r.sts,
+    level:r.lvl,
+    source_file:sourceLabel||'Carga Admin',
+    uploaded_by:CU.id
+  }));
+
+  toast('Borrando base anterior...', 'inf');
+  const {error:delErr} = await SB.from('training_records').delete().gte('id',0);
+  if(delErr) throw delErr;
+
+  toast(`Subiendo ${dbRows.length} registros a Supabase...`, 'inf');
+  const chunkSize=500;
+  for(let i=0;i<dbRows.length;i+=chunkSize){
+    const chunk=dbRows.slice(i,i+chunkSize);
+    const {error:insErr} = await SB.from('training_records').insert(chunk);
+    if(insErr) throw insErr;
+    if(i % 3000 === 0) console.log(`Subidos ${Math.min(i+chunkSize,dbRows.length)} de ${dbRows.length}`);
+  }
+  await loadSupabaseData(true);
+  toast(`✓ Base reemplazada: ${dbRows.length} registros`, 'ok');
+}
+
+function downloadCurrentJson(){
+  if(!CU || CU.role!=='admin'){
+    toast('Solo Admin puede exportar la base','err');
+    return;
+  }
+  if(!ALL.length){toast('No hay datos cargados para exportar','err');return;}
+  const payload = {
+    source:'Exportado desde Training Manager / Supabase',
+    generatedAt:new Date().toISOString(),
+    records:ALL.map(r=>({
+      employee_id:r.id,
+      employee_name:r.emp,
+      skill_code:r.sc,
+      skill_name:r.sn,
+      status:r.sts,
+      level:r.lvl,
+      date_from:r.df,
+      date_to:r.dt,
+      supervisor:r.sup
+    }))
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='training-certificados-export.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  toast('JSON exportado','ok');
+}
+
+function importFile(evt){
+  if(!CU || CU.role!=='admin'){
+    toast('Solo el usuario Admin puede cargar la base de datos','err');
+    evt.target.value='';
+    return;
+  }
+  const file=evt.target.files[0]; if(!file) return;
+  if(!confirm('Esta acción borrará y reemplazará toda la tabla training_records en Supabase. ¿Continuar?')){
+    evt.target.value='';
+    return;
+  }
+  const r=new FileReader();
+  r.onload=async e=>{
+    try{
+      const isExcel=/\.(xlsx|xls)$/i.test(file.name);
+      const wb=XLSX.read(e.target.result,{type:isExcel?'array':'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{defval:''});
+      await replaceSupabaseRecordsFromRaw(raw,file.name);
+    }catch(er){toast('Error al cargar a Supabase: '+(er.message||er),'err');console.error(er);}
+  };
+  if(/\.(xlsx|xls)$/i.test(file.name)) r.readAsArrayBuffer(file);
+  else r.readAsBinaryString(file);
+  evt.target.value='';
+}
+
+// ══════════════════════════════
+//  FILTER + RENDER
+// ══════════════════════════════
+function applyFilter(){
+  const q=(document.getElementById('empQ').value||'').toLowerCase();
+  const sf=document.getElementById('empSF').value;
+  FILT=ALL.filter(r=>{
+    const mq=!q||[r.id,r.emp,r.sc,r.sn].some(v=>(v||'').toLowerCase().includes(q));
+    const ms=!sf||r._s===sf;
+    return mq&&ms;
+  });
+  PAGE=1; SEL.clear(); render();
+}
+
+function render(){
+  const tbody=document.getElementById('empBody');
+  // Stats based on current filter / search
+  const statsSource = FILT;
+  document.getElementById('stTotal').textContent=statsSource.length;
+  document.getElementById('stComp').textContent=statsSource.filter(r=>r._s==='comp').length;
+  document.getElementById('stExpir').textContent=statsSource.filter(r=>r._s==='expir').length;
+  document.getElementById('stExpd').textContent=statsSource.filter(r=>r._s==='expd').length;
+  document.getElementById('stProg').textContent=statsSource.filter(r=>r._s==='prog').length;
+
+  if(!FILT.length){
+    tbody.innerHTML=`<tr><td colspan="10"><div class="empty">Sin resultados. Verifica la búsqueda o actualiza la base desde Supabase.</div></td></tr>`;
+    renderPag(); return;
+  }
+  const start=(PAGE-1)*PER;
+  const page=FILT.slice(start,start+PER);
+  tbody.innerHTML=page.map((row,i)=>{
+    const gi=start+i;
+    const chk=SEL.has(gi)?'checked':'';
+    const rc=ROW_CLASS[row._s]||'';
+    const dt=(row.dt&&row.dt!=='NaN'&&row.dt!=='')?row.dt:'—';
+    return `<tr class="${rc}" onclick="openDetail(${gi})">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} style="accent-color:var(--gold)" onchange="selRow(${gi},this)"></td>
+      <td style="font-family:monospace;font-size:11px;font-weight:500;color:var(--muted)">${row.id||'—'}</td>
+      <td style="font-weight:500;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">${row.emp}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--gold)">${row.sc}</td>
+      <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.sn}</td>
+      <td style="font-size:11px;white-space:nowrap">${row.df||'—'}</td>
+      <td style="font-size:11px;white-space:nowrap">${dt}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.sup||'—'}</td>
+      <td>${badge(row._s)}</td>
+      <td onclick="event.stopPropagation()">
+        <button style="background:none;border:1px solid var(--border2);border-radius:5px;color:var(--gold);font-size:10px;padding:3px 8px;cursor:pointer;font-family:'Inter',sans-serif;"
+          onclick="quickCert(${gi})">PDF</button>
+      </td>
+    </tr>`;
+  }).join('');
+  renderPag();
+  updateSelUI();
+}
+
+function renderPag(){
+  const tot=FILT.length; const tp=Math.ceil(tot/PER)||1;
+  const s=tot===0?0:(PAGE-1)*PER+1; const e=Math.min(PAGE*PER,tot);
+  document.getElementById('pagInfo').textContent=tot===0?'0 registros':`${s}–${e} de ${tot}`;
+  document.getElementById('bPrev').disabled=PAGE<=1;
+  document.getElementById('bNext').disabled=PAGE>=tp;
+}
+
+function goPage(d){PAGE+=d;render();}
+
+function toggleAll(cb){
+  if(cb.checked){FILT.forEach((_,i)=>SEL.add(i));}
+  else {SEL.clear();}
+  render();
+}
+function selectAllFiltered(){FILT.forEach((_,i)=>SEL.add(i));render();}
+function clearSelection(){SEL.clear();render();}
+function selRow(gi,cb){cb.checked?SEL.add(gi):SEL.delete(gi);updateSelUI();}
+function updateSelUI(){
+  document.getElementById('selCnt').textContent=SEL.size;
+  document.getElementById('multiBtn').style.display=SEL.size>0?'flex':'none';
+  document.getElementById('clearSelBtn').style.display=SEL.size>0?'flex':'none';
+  const chk=document.getElementById('chkAll');
+  if(chk){chk.checked=FILT.length>0&&FILT.every((_,i)=>SEL.has(i));}
+}
+
+// ══════════════════════════════
+//  DETAIL MODAL
+// ══════════════════════════════
+function openDetail(gi){
+  const row=FILT[gi];
+  detailEmpId=row.id;
+  const dt=(row.dt&&row.dt!=='NaN'&&row.dt!=='')?row.dt:'—';
+  document.getElementById('dmName').textContent=row.emp;
+  document.getElementById('dmSub').textContent=`ID: ${row.id} · ${row.sc}`;
+  document.getElementById('dmGrid').innerHTML=`
+    <div class="iItem"><label>Skill Code</label><span style="font-family:monospace;color:var(--gold)">${row.sc}</span></div>
+    <div class="iItem"><label>Skill Name</label><span>${row.sn}</span></div>
+    <div class="iItem"><label>Date From</label><span>${row.df||'—'}</span></div>
+    <div class="iItem"><label>Date To</label><span>${dt}</span></div>
+    <div class="iItem"><label>Level</label><span>${row.lvl||'—'}</span></div>
+    <div class="iItem"><label>Status</label><span>${badge(row._s)}</span></div>
+    <div class="iItem" style="grid-column:1/-1"><label>Supervisor</label><span>${row.sup||'—'}</span></div>`;
+
+  // Other skills for this employee
+  const others=ALL.filter(r=>r.id===row.id&&r.sc!==row.sc).sort((a,b)=>pd(b.df)-pd(a.df));
+  if(others.length){
+    document.getElementById('dmOtherSkills').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr>
+          <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Skill Code</th>
+          <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Skill Name</th>
+          <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Date From</th>
+          <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Estado</th>
+        </tr></thead>
+        <tbody>${others.slice(0,20).map(r=>`
+          <tr class="${ROW_CLASS[r._s]||''}">
+            <td style="padding:5px 8px;font-family:monospace;color:var(--gold)">${r.sc}</td>
+            <td style="padding:5px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.sn}</td>
+            <td style="padding:5px 8px;white-space:nowrap">${r.df||'—'}</td>
+            <td style="padding:5px 8px">${badge(r._s)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>${others.length>20?`<p style="font-size:11px;color:var(--muted);padding:6px 8px;">+${others.length-20} más competencias...</p>`:''}`;
+  } else {
+    document.getElementById('dmOtherSkills').innerHTML=`<p style="font-size:12px;color:var(--muted);">Sin otras competencias registradas.</p>`;
+  }
+  document.getElementById('detModal').classList.add('open');
+}
+
+function openCertFromDetail(){
+  close2('detModal');
+  openCertModal(detailEmpId);
+}
+
+function quickCert(gi){
+  const row=FILT[gi];
+  detailEmpId=row.id;
+  openCertModal(row.id);
+}
+
+async function generateBulkPdfs(ids,filterMode='all'){
+  const cleanIds=[...new Set(ids.filter(Boolean))];
+  if(!cleanIds.length){toast('No hay empleados para descargar','err');return;}
+  toast(`Generando ${cleanIds.length} certificado(s)...`,'inf');
+  for(const id of cleanIds){
+    await generatePDF(id,'—','—',filterMode,true);
+    await new Promise(r=>setTimeout(r,250));
+  }
+  toast(`✓ ${cleanIds.length} certificado(s) descargados`,'ok');
+}
+
+async function openMultiCert(){
+  const rows=[...SEL].map(gi=>FILT[gi]).filter(Boolean);
+  const ids=[...new Set(rows.map(r=>r.id))];
+  if(ids.length===1){ detailEmpId=ids[0]; openCertModal(ids[0]); }
+  else { await generateBulkPdfs(ids,'all'); }
+}
+
+async function openAllCert(){
+  const ids=[...new Set(FILT.map(r=>r.id))];
+  await generateBulkPdfs(ids,'all');
+}
+
+function openCertModal(empId){
+  const row=ALL.find(r=>r.id===empId);
+  document.getElementById('certSub').textContent=row?`${row.emp} · ID: ${empId}`:`ID: ${empId}`;
+  document.getElementById('cLF').value='';
+  document.getElementById('cLT').value='';
+  document.getElementById('cFilt').value='all';
+  document.getElementById('certModal').classList.add('open');
+}
+
+async function doCert(){
+  const lf=document.getElementById('cLF').value||'—';
+  const lt=document.getElementById('cLT').value||'—';
+  const filt=document.getElementById('cFilt').value;
+  await generatePDF(detailEmpId,lf,lt,filt);
+  close2('certModal');
+}
+
+// ══════════════════════════════
+//  GENERATE PDF
+// ══════════════════════════════
+async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
+  const empRows=ALL.filter(r=>r.id==empId);
+  if(!empRows.length){toast('Sin datos para este empleado','err');return;}
+
+  // Filter skills
+  let skills=[...empRows];
+  if(filterMode==='comp') skills=skills.filter(r=>r._s==='comp');
+  else if(filterMode==='compExpir') skills=skills.filter(r=>r._s==='comp'||r._s==='expir');
+  skills.sort((a,b)=>pd(b.df)-pd(a.df));
+
+  const empName=empRows[0].emp;
+  const supervisor=empRows[0].sup||'—';
+  const lastDate=skills.length>0?skills[0].df:'—';
+  const logoWhite=await logoToDataURL(LOGO_WHITE_URL);
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297;
+  const ACCENT=[163,145,97]; // #A39161
+
+
+  // ── Background, corporate light style
+  doc.setFillColor(246,247,246);
+  doc.rect(0,0,W,H,'F');
+
+  // ── Header band
+  doc.setFillColor(0,85,126);
+  doc.rect(0,0,W,50,'F');
+  doc.setFillColor(...ACCENT);
+  doc.rect(0,0,W,4,'F');
+  doc.setDrawColor(...ACCENT);
+  doc.setLineWidth(0.5);
+  doc.line(10,48,W-10,48);
+
+  // Logo, only once at the top, smaller and with original proportion
+  if(logoWhite){
+    try{
+      const imgProps = doc.getImageProperties(logoWhite);
+      const logoW = 24;
+      const logoH = (imgProps.height * logoW) / imgProps.width;
+      doc.addImage(logoWhite,'PNG',W-10-logoW,9,logoW,logoH);
+    }catch(e){ console.warn('No se pudo insertar logo',e); }
+  }
+
+  // ── Header text
+  doc.setTextColor(...ACCENT);
+  doc.setFontSize(8);
+  doc.setFont('helvetica','bold');
+  doc.text('BARRICK ACADEMY',10,15);
+
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(20);
+  doc.setFont('helvetica','bold');
+  doc.text('TRAINING & ASSESSMENT',10,27);
+
+  doc.setFontSize(9);
+  doc.setTextColor(218,229,235);
+  doc.setFont('helvetica','normal');
+  doc.text('EMPLOYEE CERTIFICATE OF COMPETENCE',10,36);
+
+  // ── Employee info card
+  doc.setFillColor(255,255,255);
+  doc.roundedRect(10,58,W-20,34,3,3,'F');
+  doc.setDrawColor(221,229,233);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(10,58,W-20,34,3,3,'S');
+  doc.setFillColor(...ACCENT);
+  doc.roundedRect(10,58,3.2,34,1,1,'F');
+
+  function infoLabel(x,y,lbl){ doc.setTextColor(101,101,101);doc.setFontSize(7);doc.setFont('helvetica','bold');doc.text(lbl,x,y);}
+  function infoVal(x,y,val,sz=10){ doc.setTextColor(19,34,49);doc.setFontSize(sz);doc.setFont('helvetica','bold');doc.text(String(val),x,y);}
+
+  infoLabel(16,67,'EMPLOYEE');
+  infoVal(16,75,empName,10);
+
+  infoLabel(100,67,'EMPLOYEE ID');
+  infoVal(100,75,String(empId));
+
+  infoLabel(16,83,'SUPERVISOR');
+  const supStr=doc.splitTextToSize(supervisor,80);
+  infoVal(16,89,supStr[0]||'—',8);
+
+  infoLabel(100,83,'LEVEL FROM / TO');
+  infoVal(100,89,`${levelFrom}  /  ${levelTo}`,9);
+
+  // ── Last training date & filter info
+  doc.setFillColor(241,245,247);
+  doc.roundedRect(10,98,90,15,2,2,'F');
+  doc.roundedRect(105,98,W-115,15,2,2,'F');
+
+  infoLabel(14,105,'ÚLTIMO ENTRENAMIENTO COMPLETADO');
+  infoVal(14,110,lastDate,8);
+
+  const filtLbl={all:'Todas las competencias',comp:'Solo Competentes',compExpir:'Competentes + Expiring Soon'};
+  infoLabel(109,105,'FILTER');
+  infoVal(109,110,filtLbl[filterMode]||filterMode,7);
+
+  // ── Skills Table
+  const stMap={comp:'Competent',expir:'Expiring Soon',expd:'Expired',prog:'In Progress'};
+  const rows=skills.map(r=>{
+    const dt=(r.dt&&r.dt!=='NaN'&&r.dt!=='')?r.dt:'—';
+    return [r.sc,r.sn,r.df||'—',dt,stMap[r._s]||r._s];
+  });
+
+  doc.autoTable({
+    head:[['Skill Code','Skill Name','Date From','Date To','Status']],
+    body:rows,
+    startY:118,
+    margin:{left:10,right:10},
+    tableWidth:'auto',
+    styles:{
+      font:'helvetica',fontSize:7.5,textColor:[19,34,49],
+      fillColor:[255,255,255],lineColor:[224,231,235],lineWidth:0.18,cellPadding:2.8
+    },
+    headStyles:{
+      fillColor:[0,85,126],textColor:[255,255,255],
+      fontStyle:'bold',fontSize:7,halign:'left'
+    },
+    columnStyles:{
+      0:{cellWidth:30,fontStyle:'bold',textColor:ACCENT},
+      1:{cellWidth:'auto'},
+      2:{cellWidth:22,halign:'center'},
+      3:{cellWidth:22,halign:'center'},
+      4:{cellWidth:26,halign:'center',fontStyle:'bold'}
+    },
+    alternateRowStyles:{fillColor:[248,250,251]},
+    didParseCell:function(d){
+      if(d.section==='body'){
+        const status=d.row.raw[4];
+        if(status==='Expired') d.cell.styles.fillColor=[253,239,239];
+        else if(status==='Expiring Soon') d.cell.styles.fillColor=[252,243,239];
+      }
+      if(d.section==='body'&&d.column.index===4){
+        const v=d.cell.raw;
+        if(v==='Expired') d.cell.styles.textColor=[198,35,37];
+        else if(v==='Expiring Soon') d.cell.styles.textColor=[212,100,75];
+        else if(v==='Competent') d.cell.styles.textColor=[81,133,122];
+        else if(v==='In Progress') d.cell.styles.textColor=[115,140,180];
+      }
+    }
+  });
+
+  const fy=doc.lastAutoTable.finalY||250;
+
+  // ── Footer divider + info. No second logo.
+  doc.setDrawColor(221,229,233);
+  doc.setLineWidth(0.25);
+  doc.line(10,fy+8,W-10,fy+8);
+
+  const genDate=new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'});
+  doc.setTextColor(101,101,101);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica','normal');
+  doc.text(`Report generated by: ${CU?CU.name:'—'}`,10,fy+14);
+  doc.text(`Date: ${genDate}`,10,fy+20);
+  doc.text(`Total competencias: ${skills.length}   |   Source: WFM Employee Skills`,10,fy+26);
+
+  // Footer legend removed to avoid garbled symbols.
+
+  doc.setFillColor(...ACCENT);
+  doc.rect(0,H-2,W,2,'F');
+
+  doc.save(`Cert_${empId}_${empName.replace(/[,\s]+/g,'_')}.pdf`);
+  try{
+    if(CU && CU.id){
+      await SB.from('certificate_logs').insert({
+        generated_by: CU.id,
+        employee_id: String(empId),
+        employee_name: empName,
+        filter_used: filterMode,
+        total_skills: skills.length
+      });
+    }
+  }catch(e){ console.warn('No se pudo guardar log de certificado:', e); }
+  if(!silent) toast(`✓ Certificado generado: ${empName}`,'ok');
+}
+
+// ══════════════════════════════
+//  ADMIN
+// ══════════════════════════════
+async function loadProfiles(){
+  if(!CU || CU.role!=='admin') return [];
+  const {data,error}=await SB.from('profiles').select('id, full_name, role, active, created_at').order('full_name',{ascending:true});
+  if(error){console.warn(error); toast('No se pudieron leer los perfiles','err'); return [];}
+  PROFILES=data||[];
+  return PROFILES;
+}
+
+async function renderUserTable(){
+  const tbl=document.getElementById('uTbl');
+  if(!tbl) return;
+  if(!CU || CU.role!=='admin') return;
+  tbl.innerHTML=`<tr><td style="font-size:12px;color:var(--muted);padding:8px;">Cargando usuarios...</td></tr>`;
+  const rows=await loadProfiles();
+  if(!rows.length){tbl.innerHTML=`<tr><td style="font-size:12px;color:var(--muted);padding:8px;">Sin perfiles registrados.</td></tr>`;return;}
+  tbl.innerHTML=
+    `<tr><th>Nombre</th><th>Rol</th><th>Activo</th></tr>`+
+    rows.map(u=>`<tr>
+      <td>${u.full_name||'—'}<div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-top:2px;">${u.id}</div></td>
+      <td><span class="badge ${u.role==='admin'?'expir':'comp'}">${u.role}</span></td>
+      <td>${u.active?'Sí':'No'}</td>
+    </tr>`).join('');
+}
+
+function renderAdminStats(){
+  const el=document.getElementById('adminStats');
+  if(!el) return;
+  el.innerHTML=`
+    <div>Registros cargados en pantalla: <strong>${ALL.length}</strong></div>
+    <div>Usuarios/perfiles visibles: <strong>${PROFILES.length || '—'}</strong></div>
+    <div>Competentes: <strong style="color:var(--green)">${ALL.filter(r=>r._s==='comp').length}</strong></div>
+    <div>Expiring Soon: <strong style="color:var(--orange)">${ALL.filter(r=>r._s==='expir').length}</strong></div>
+    <div>Expirados: <strong style="color:var(--red)">${ALL.filter(r=>r._s==='expd').length}</strong></div>
+    <div>In Progress: <strong style="color:var(--teal)">${ALL.filter(r=>r._s==='prog').length}</strong></div>`;
+}
+
+function openAddUser(){toast('Los usuarios se crean en Supabase Authentication y luego en public.profiles.','inf');}
+function addUser(){openAddUser();}
+function delUser(){toast('Para desactivar usuarios, cambia active=false en Supabase profiles.','inf');}
+
+// ══════════════════════════════
+//  UTILS
+// ══════════════════════════════
+function close2(id){document.getElementById(id).classList.remove('open');}
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`toast ${type} show`;
+  setTimeout(()=>t.className='toast',3500);
+}
+document.querySelectorAll('.overlay').forEach(el=>{
+  el.addEventListener('click',function(e){if(e.target===this)close2(this.id);});
+});
+restoreSession();
+</script>
+</body>
+</html>
