@@ -288,7 +288,7 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
       </button>
       <button class="btnO" onclick="selectAllFiltered()">Seleccionar todo filtrado</button>
       <button class="btnO" id="clearSelBtn" style="display:none" onclick="clearSelection()">Limpiar selección</button>
-      <button class="btnG" id="downloadAllBtn" onclick="openAllCert()">Descargar todo filtrado</button>
+      <button class="btnG" id="downloadAllBtn" onclick="openAllCert()">Descargar certificado/récord</button>
     </div>
 
     <div class="tWrap">
@@ -451,6 +451,7 @@ const PER = 12;
 let REMOTE_TIMER = null;
 let TOTAL_REMOTE_COUNT = null;
 let detailEmpId = null; // for cert generation from detail modal
+let bulkCertIds = null; // for certificate generation from filtered or selected records
 
 async function getProfile(userId){
   const {data,error} = await SB
@@ -1102,12 +1103,12 @@ function quickCert(gi){
   openCertModal(row.id);
 }
 
-async function generateBulkPdfs(ids,filterMode='all'){
+async function generateBulkPdfs(ids,filterMode='all',levelFrom='—',levelTo='—'){
   const cleanIds=[...new Set(ids.filter(Boolean))];
   if(!cleanIds.length){toast('No hay empleados para descargar','err');return;}
   toast(`Generando ${cleanIds.length} certificado(s)...`,'inf');
   for(const id of cleanIds){
-    await generatePDF(id,'—','—',filterMode,true);
+    await generatePDF(id,levelFrom,levelTo,filterMode,true);
     await new Promise(r=>setTimeout(r,250));
   }
   toast(`✓ ${cleanIds.length} certificado(s) descargados`,'ok');
@@ -1116,18 +1117,23 @@ async function generateBulkPdfs(ids,filterMode='all'){
 async function openMultiCert(){
   const rows=[...SEL].map(gi=>FILT[gi]).filter(Boolean);
   const ids=[...new Set(rows.map(r=>r.id))];
-  if(ids.length===1){ detailEmpId=ids[0]; openCertModal(ids[0]); }
-  else { await generateBulkPdfs(ids,'all'); }
+  if(!ids.length){toast('Selecciona al menos un registro','err');return;}
+  if(ids.length===1){ openCertModal(ids[0]); }
+  else { openCertModal(null, ids, `${ids.length} empleados seleccionados`); }
 }
 
 async function openAllCert(){
   const ids=[...new Set(FILT.map(r=>r.id))];
-  await generateBulkPdfs(ids,'all');
+  if(!ids.length){toast('Primero busque un empleado o aplique un filtro con resultados','err');return;}
+  if(ids.length===1){ openCertModal(ids[0]); }
+  else { openCertModal(null, ids, `${ids.length} empleados en el filtro actual`); }
 }
 
-function openCertModal(empId){
-  const row=ALL.find(r=>r.id===empId);
-  document.getElementById('certSub').textContent=row?`${row.emp} · ID: ${empId}`:`ID: ${empId}`;
+function openCertModal(empId, ids=null, subtitle=null){
+  bulkCertIds = ids ? [...new Set(ids.filter(Boolean))] : null;
+  detailEmpId = empId || null;
+  const row=empId ? ALL.find(r=>r.id===empId) : null;
+  document.getElementById('certSub').textContent = subtitle || (row?`${row.emp} · ID: ${empId}`:`ID: ${empId}`);
   document.getElementById('cLF').value='';
   document.getElementById('cLT').value='';
   document.getElementById('cFilt').value='all';
@@ -1138,7 +1144,12 @@ async function doCert(){
   const lf=document.getElementById('cLF').value||'—';
   const lt=document.getElementById('cLT').value||'—';
   const filt=document.getElementById('cFilt').value;
-  await generatePDF(detailEmpId,lf,lt,filt);
+  if(bulkCertIds && bulkCertIds.length){
+    await generateBulkPdfs(bulkCertIds,filt,lf,lt);
+  } else {
+    await generatePDF(detailEmpId,lf,lt,filt);
+  }
+  bulkCertIds=null;
   close2('certModal');
 }
 
@@ -1228,7 +1239,7 @@ async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
   infoVal(16,89,supStr[0]||'—',8);
 
   infoLabel(100,83,'LEVEL PROGRESSION');
-  infoVal(100,89,`${levelFrom}  ->  ${levelTo}`,9);
+  infoVal(100,89,`${levelFrom}  →  ${levelTo}`,9);
 
   // Last training date. Filter information is intentionally hidden in the PDF certificate.
   doc.setFillColor(241,245,247);
