@@ -256,21 +256,21 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
       <div class="legItem"><div class="legDot teal"></div>In Progress — en curso</div>
     </div>
 
-    <div id="dbStatusMain" style="font-size:12px;color:var(--text);background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;margin-bottom:12px;">Base: conectando a Supabase...</div>
+    <div id="dbStatusMain" style="font-size:12px;color:var(--text);background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;margin-bottom:12px;">Conectando con la base de entrenamientos...</div>
 
     <div class="helpCard" id="searchHelpCard">
       <div class="helpTitle">Cómo generar un certificado</div>
-      <div class="helpText">La tabla inicia vacía a propósito para que la página abra rápido. No carga los 139,464 registros completos. Primero busca una persona y luego genera el certificado.</div>
+      <div class="helpText">Para visualizar la información y generar certificados, favor seguir las instrucciones enumeradas. Primero busque el empleado por ID o nombre; luego valide los resultados y genere el certificado correspondiente.</div>
       <div class="helpSteps">
-        <div class="helpStep"><strong>1. Buscar</strong>Escribe el ID o parte del nombre del empleado.</div>
-        <div class="helpStep"><strong>2. Revisar</strong>Espera los resultados y confirma que sea la persona correcta.</div>
-        <div class="helpStep"><strong>3. Generar</strong>Haz clic en PDF o selecciona competencias y usa Generar seleccionados.</div>
-        <div class="helpStep"><strong>4. Descargar</strong>Completa Level From / To si aplica y descarga el certificado.</div>
+        <div class="helpStep"><strong>1. Buscar</strong>Escriba el ID o parte del nombre del empleado.</div>
+        <div class="helpStep"><strong>2. Revisar</strong>Verifique que los resultados correspondan a la persona correcta.</div>
+        <div class="helpStep"><strong>3. Generar</strong>Haga clic en PDF o seleccione competencias y use Generar seleccionados.</div>
+        <div class="helpStep"><strong>4. Descargar</strong>Complete el nivel actual y el nivel destino, si aplica, y descargue el certificado.</div>
       </div>
     </div>
 
     <div class="toolbar">
-      <button class="btnO" id="refreshPublicBtn" type="button" onclick="performRemoteSearch(this)">Buscar en Supabase</button>
+      <button class="btnO" id="refreshPublicBtn" type="button" onclick="performRemoteSearch(this)">Buscar récord de entrenamientos</button>
       <div class="sWrap">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="sInput" id="empQ" type="text" placeholder="Escribe ID o nombre para buscar y generar certificado..." oninput="debouncedRemoteSearch()" onkeydown="if(event.key==='Enter')performRemoteSearch()">
@@ -376,8 +376,8 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
   <div class="mTitle">Configurar Certificado</div>
   <div class="mSub" id="certSub">—</div>
   <div class="fRow">
-    <div class="fGroup"><label>Level From (actual)</label><input type="text" id="cLF" placeholder="Ej: 3B"></div>
-    <div class="fGroup"><label>Level To (destino)</label><input type="text" id="cLT" placeholder="Ej: 2"></div>
+    <div class="fGroup"><label>Nivel actual / Level From</label><input type="text" id="cLF" placeholder="Ej: 3B"></div>
+    <div class="fGroup"><label>Nivel destino / Level To</label><input type="text" id="cLT" placeholder="Ej: 2"></div>
   </div>
   <div class="fGroup">
     <label>Competencias a incluir</label>
@@ -693,15 +693,15 @@ function uiFromDbRow(r){
 
 async function initializeFastSearchMode(){
   ALL=[]; FILT=[]; SEL.clear(); PAGE=1; render();
-  setDbStatusText('Base: conectada a Supabase. Escribe ID o nombre para buscar sin cargar toda la base.');
+  setDbStatusText('Base de entrenamientos conectada. Escribe el ID o nombre del empleado para visualizar sus récords.');
   try{
     const {count,error}=await SB.from('training_records').select('id',{count:'exact',head:true});
     if(error) throw error;
     TOTAL_REMOTE_COUNT=count||0;
-    setDbStatusText('Base: Supabase conectada | '+TOTAL_REMOTE_COUNT.toLocaleString('en-US')+' registros disponibles | Busca por ID o nombre');
+    setDbStatusText('Base de entrenamientos conectada | '+TOTAL_REMOTE_COUNT.toLocaleString('en-US')+' registros disponibles | Busca por ID o nombre');
   }catch(err){
     console.warn('No se pudo contar Supabase:',err);
-    setDbStatusText('Base: Supabase conectada | Busca por ID o nombre');
+    setDbStatusText('Base de entrenamientos conectada | Busca por ID o nombre');
   }
 }
 
@@ -752,12 +752,12 @@ async function performRemoteSearch(btn=null){
   if(qRaw.length<2){
     ALL=[]; FILT=[]; render();
     const total = TOTAL_REMOTE_COUNT ? ' | '+TOTAL_REMOTE_COUNT.toLocaleString('en-US')+' registros disponibles' : '';
-    setDbStatusText('Base: Supabase conectada'+total+' | Tabla vacía hasta buscar ID o nombre');
+    setDbStatusText('Base de entrenamientos conectada'+total+' | Busca por ID o nombre para visualizar resultados');
     return;
   }
 
   if(btn){ btn.disabled=true; btn.dataset.oldText=btn.textContent; btn.textContent='Buscando...'; }
-  setDbStatusText('Buscando en Supabase: '+qRaw+'...');
+  setDbStatusText('Buscando récords de entrenamiento: '+qRaw+'...');
 
   try{
     const q=sanitizeForOr(qRaw);
@@ -782,15 +782,15 @@ async function performRemoteSearch(btn=null){
     const shown=ALL.length.toLocaleString('en-US');
     const total=(typeof count==='number') ? count.toLocaleString('en-US') : shown;
     const more=(typeof count==='number' && count>ALL.length) ? ' | mostrando primeros '+shown+' de '+total+'; refine la búsqueda' : ' | '+shown+' resultados';
-    setDbStatusText('Base: búsqueda Supabase "'+qRaw+'"'+more);
+    setDbStatusText('Resultados para "'+qRaw+'"'+more);
     if(!ALL.length) toast('Sin resultados para esa búsqueda','inf');
   }catch(err){
     console.error('Remote search error:',err);
     const msg=err && err.message ? err.message : String(err);
-    setDbStatusText('Error al buscar en Supabase: '+msg);
-    toast('Error Supabase: '+msg,'err');
+    setDbStatusText('Error al buscar registros de entrenamiento: '+msg);
+    toast('Error al buscar registros: '+msg,'err');
   }finally{
-    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.oldText || 'Buscar en Supabase'; }
+    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.oldText || 'Buscar récord de entrenamientos'; }
   }
 }
 
@@ -853,7 +853,7 @@ async function loadSupabaseData(silent=false, btn=null){
     console.error('Supabase load error:',err);
     const msg = err && err.message ? err.message : String(err);
     setDbStatusText('Error al leer Supabase: '+msg);
-    toast('Error Supabase: '+msg,'err');
+    toast('Error al buscar registros: '+msg,'err');
     applyFilter();
     return false;
   }finally{
@@ -991,7 +991,7 @@ function render(){
   document.getElementById('stProg').textContent=statsSource.filter(r=>r._s==='prog').length;
 
   if(!FILT.length){
-    tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><strong style="display:block;color:var(--text);font-size:15px;margin-bottom:6px;">Busca una persona para empezar</strong><span>Escribe el ID o el nombre del empleado en la barra superior y presiona "Buscar en Supabase". La tabla no carga todos los registros al inicio para que la página sea más rápida.</span></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><strong style="display:block;color:var(--text);font-size:15px;margin-bottom:6px;">Busca una persona para empezar</strong><span>Escribe el ID o el nombre del empleado en la barra superior y presiona "Buscar récord de entrenamientos". Los resultados se consultan directamente desde la base de entrenamientos.</span></div></td></tr>`;
     renderPag(); return;
   }
   const start=(PAGE-1)*PER;
@@ -1227,22 +1227,17 @@ async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
   const supStr=doc.splitTextToSize(supervisor,80);
   infoVal(16,89,supStr[0]||'—',8);
 
-  infoLabel(100,83,'LEVEL FROM / TO');
-  infoVal(100,89,`${levelFrom}  /  ${levelTo}`,9);
+  infoLabel(100,83,'LEVEL PROGRESSION');
+  infoVal(100,89,`${levelFrom}  ->  ${levelTo}`,9);
 
-  // ── Last training date & filter info
+  // Last training date. Filter information is intentionally hidden in the PDF certificate.
   doc.setFillColor(241,245,247);
-  doc.roundedRect(10,98,90,15,2,2,'F');
-  doc.roundedRect(105,98,W-115,15,2,2,'F');
+  doc.roundedRect(10,98,W-20,15,2,2,'F');
 
   infoLabel(14,105,'ÚLTIMO ENTRENAMIENTO COMPLETADO');
   infoVal(14,110,lastDate,8);
 
-  const filtLbl={all:'Todas las competencias',comp:'Solo Competentes',compExpir:'Competentes + Expiring Soon'};
-  infoLabel(109,105,'FILTER');
-  infoVal(109,110,filtLbl[filterMode]||filterMode,7);
-
-  // Skills Table. Date To is intentionally hidden in the PDF certificate.
+  // Skills Table. Date To and filter details are intentionally hidden in the PDF certificate.
   const stMap={comp:'Competent',expir:'Expiring Soon',expd:'Expired',prog:'In Progress'};
   const rows=skills.map(r=>{
     return [r.sc,r.sn,r.df||'—',stMap[r._s]||r._s];
