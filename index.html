@@ -248,7 +248,10 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
       <div class="legItem"><div class="legDot teal"></div>In Progress — en curso</div>
     </div>
 
+    <div id="dbStatusMain" style="font-size:12px;color:var(--text);background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:9px 10px;margin-bottom:12px;">Base: cargando al iniciar sesión...</div>
+
     <div class="toolbar">
+      <button class="btnO" id="refreshPublicBtn" type="button" onclick="loadSupabaseData(false,this)">Actualizar datos</button>
       <div class="sWrap">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="sInput" id="empQ" type="text" placeholder="Buscar por ID o nombre del empleado..." oninput="applyFilter()">
@@ -661,13 +664,11 @@ function uiFromDbRow(r){
 async function loadSupabaseData(silent=false, btn=null){
   if(!CU){
     toast('No hay sesión activa. Cierra e inicia sesión otra vez.','err');
-    const el=document.getElementById('dbStatus');
-    if(el) el.textContent='Error: no hay sesión activa.';
+    setDbStatusText('Error: no hay sesión activa.');
     return false;
   }
 
-  const statusEl=document.getElementById('dbStatus');
-  if(statusEl) statusEl.textContent='Base: cargando desde Supabase...';
+  setDbStatusText('Base: cargando desde Supabase...');
   if(btn){ btn.disabled=true; btn.dataset.oldText=btn.textContent; btn.textContent='Cargando...'; }
   if(!silent) toast('Cargando base desde Supabase...','inf');
 
@@ -675,6 +676,16 @@ async function loadSupabaseData(silent=false, btn=null){
     const pageSize=1000;
     let from=0;
     let rows=[];
+    let totalExpected=null;
+
+    // First ask Supabase for the expected total so the user can see real progress.
+    try{
+      const {count,countError} = await SB
+        .from('training_records')
+        .select('id',{count:'exact',head:true});
+      if(!countError && typeof count === 'number') totalExpected=count;
+    }catch(_e){ totalExpected=null; }
+
     while(true){
       const {data,error} = await SB
         .from('training_records')
@@ -682,7 +693,15 @@ async function loadSupabaseData(silent=false, btn=null){
         .order('id',{ascending:true})
         .range(from, from+pageSize-1);
       if(error) throw error;
+
       rows = rows.concat(data || []);
+      {
+        const loaded = rows.length.toLocaleString('en-US');
+        const totalTxt = totalExpected ? ' de ' + totalExpected.toLocaleString('en-US') : '';
+        setDbStatusText('Base: cargando ' + loaded + totalTxt + ' registros desde Supabase...');
+      }
+      await new Promise(r=>setTimeout(r,0));
+
       if(!data || data.length < pageSize) break;
       from += pageSize;
     }
@@ -700,20 +719,25 @@ async function loadSupabaseData(silent=false, btn=null){
   }catch(err){
     console.error('Supabase load error:',err);
     const msg = err && err.message ? err.message : String(err);
-    if(statusEl) statusEl.textContent='Error al leer Supabase: '+msg;
+    setDbStatusText('Error al leer Supabase: '+msg);
     toast('Error Supabase: '+msg,'err');
     applyFilter();
     return false;
   }finally{
-    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.oldText || 'Actualizar desde Supabase'; }
+    if(btn){ btn.disabled=false; btn.textContent=btn.dataset.oldText || 'Actualizar datos'; }
   }
 }
 
+function setDbStatusText(text){
+  ['dbStatus','dbStatusMain'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=text;
+  });
+}
+
 function updateDbStatus(){
-  const el=document.getElementById('dbStatus');
-  if(!el) return;
   const total = ALL.length ? ` | ${ALL.length} registros` : '';
-  el.textContent = `Base: ${LAST_SOURCE}${LAST_LOAD_AT ? ' | '+LAST_LOAD_AT : ''}${total}`;
+  setDbStatusText(`Base: ${LAST_SOURCE}${LAST_LOAD_AT ? ' | '+LAST_LOAD_AT : ''}${total}`);
 }
 
 async function replaceSupabaseRecordsFromRaw(raw, sourceLabel){
@@ -1085,15 +1109,14 @@ async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
   infoLabel(109,105,'FILTER');
   infoVal(109,110,filtLbl[filterMode]||filterMode,7);
 
-  // ── Skills Table
+  // Skills Table. Date To is intentionally hidden in the PDF certificate.
   const stMap={comp:'Competent',expir:'Expiring Soon',expd:'Expired',prog:'In Progress'};
   const rows=skills.map(r=>{
-    const dt=(r.dt&&r.dt!=='NaN'&&r.dt!=='')?r.dt:'—';
-    return [r.sc,r.sn,r.df||'—',dt,stMap[r._s]||r._s];
+    return [r.sc,r.sn,r.df||'—',stMap[r._s]||r._s];
   });
 
   doc.autoTable({
-    head:[['Skill Code','Skill Name','Date From','Date To','Status']],
+    head:[['Skill Code','Skill Name','Date From','Status']],
     body:rows,
     startY:118,
     margin:{left:10,right:10},
@@ -1107,20 +1130,19 @@ async function generatePDF(empId,levelFrom,levelTo,filterMode,silent=false){
       fontStyle:'bold',fontSize:7,halign:'left'
     },
     columnStyles:{
-      0:{cellWidth:30,fontStyle:'bold',textColor:ACCENT},
+      0:{cellWidth:32,fontStyle:'bold',textColor:ACCENT},
       1:{cellWidth:'auto'},
-      2:{cellWidth:22,halign:'center'},
-      3:{cellWidth:22,halign:'center'},
-      4:{cellWidth:26,halign:'center',fontStyle:'bold'}
+      2:{cellWidth:26,halign:'center'},
+      3:{cellWidth:30,halign:'center',fontStyle:'bold'}
     },
     alternateRowStyles:{fillColor:[248,250,251]},
     didParseCell:function(d){
       if(d.section==='body'){
-        const status=d.row.raw[4];
+        const status=d.row.raw[3];
         if(status==='Expired') d.cell.styles.fillColor=[253,239,239];
         else if(status==='Expiring Soon') d.cell.styles.fillColor=[252,243,239];
       }
-      if(d.section==='body'&&d.column.index===4){
+      if(d.section==='body'&&d.column.index===3){
         const v=d.cell.raw;
         if(v==='Expired') d.cell.styles.textColor=[198,35,37];
         else if(v==='Expiring Soon') d.cell.styles.textColor=[212,100,75];
