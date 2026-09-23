@@ -369,6 +369,19 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
 </div>
 </div>
 
+<!-- DOWNLOAD FORMAT MODAL -->
+<div class="overlay" id="certFormatModal" role="dialog" aria-modal="true" aria-labelledby="certFormatTitle">
+<div class="modal" style="width:380px">
+  <button class="mClose" aria-label="Cerrar" onclick="close2('certFormatModal')">×</button>
+  <div class="mTitle" id="certFormatTitle">Descargar certificado/récord</div>
+  <div class="mSub">Seleccione el formato de descarga.</div>
+  <div style="display:flex;gap:12px">
+    <button class="btnG" style="flex:1;justify-content:center;padding:16px" onclick="close2('certFormatModal');openAllCert('pdf')">PDF</button>
+    <button class="btnO" style="flex:1;justify-content:center;padding:16px" onclick="close2('certFormatModal');openAllCert('excel')">Excel</button>
+  </div>
+</div>
+</div>
+
 <!-- CERT CONFIG MODAL -->
 <div class="overlay" id="certModal">
 <div class="modal" style="width:460px">
@@ -389,7 +402,7 @@ tbody td{padding:8px 13px;font-size:12px;color:var(--text);}
   </div>
   <button class="btnG" style="width:100%;justify-content:center;margin-top:6px;" onclick="doCert()">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-    Descargar PDF
+    <span id="certDownloadLabel">Descargar PDF</span>
   </button>
 </div>
 </div>
@@ -1122,14 +1135,19 @@ async function openMultiCert(){
   else { openCertModal(null, ids, `${ids.length} empleados seleccionados`); }
 }
 
-async function openAllCert(){
+async function openAllCert(format=null){
   const ids=[...new Set(FILT.map(r=>r.id))];
   if(!ids.length){toast('Primero busque un empleado o aplique un filtro con resultados','err');return;}
+  if(!format){document.getElementById('certFormatModal').classList.add('open');return;}
   if(ids.length===1){ openCertModal(ids[0]); }
   else { openCertModal(null, ids, `${ids.length} empleados en el filtro actual`); }
+  certDownloadFormat = format==='excel' ? 'excel' : 'pdf';
+  document.getElementById('certDownloadLabel').textContent=certDownloadFormat==='excel'?'Descargar Excel':'Descargar PDF';
 }
 
 function openCertModal(empId, ids=null, subtitle=null){
+  certDownloadFormat='pdf';
+  document.getElementById('certDownloadLabel').textContent='Descargar PDF';
   bulkCertIds = ids ? [...new Set(ids.filter(Boolean))] : null;
   detailEmpId = empId || null;
   const row=empId ? ALL.find(r=>r.id===empId) : null;
@@ -1141,6 +1159,7 @@ function openCertModal(empId, ids=null, subtitle=null){
 }
 
 async function doCert(){
+  if(certDownloadFormat==='excel'){await doExcelCert();return;}
   const lf=document.getElementById('cLF').value||'—';
   const lt=document.getElementById('cLT').value||'—';
   const filt=document.getElementById('cFilt').value;
@@ -1151,6 +1170,124 @@ async function doCert(){
   }
   bulkCertIds=null;
   close2('certModal');
+}
+
+// Excel export is isolated from the existing PDF and database configuration.
+let certDownloadFormat='pdf';
+let certExcelLibraryPromise=null;
+let certExcelBusy=false;
+function loadCertExcelLibrary(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if(certExcelLibraryPromise) return certExcelLibraryPromise;
+  certExcelLibraryPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    script.onload=()=>window.ExcelJS?resolve(window.ExcelJS):reject(new Error('Excel no disponible'));
+    script.onerror=()=>{script.remove();reject(new Error('No se pudo cargar Excel. Verifique su conexión e intente nuevamente.'));};
+    document.head.appendChild(script);
+  }).catch(error=>{certExcelLibraryPromise=null;throw error;});
+  return certExcelLibraryPromise;
+}
+async function doExcelCert(){
+  if(certExcelBusy) return;
+  certExcelBusy=true;
+  const button=document.querySelector('#certModal button[onclick="doCert()"]');
+  const ids=bulkCertIds&&bulkCertIds.length?[...bulkCertIds]:[detailEmpId];
+  const lf=document.getElementById('cLF').value||'—';
+  const lt=document.getElementById('cLT').value||'—';
+  const filt=document.getElementById('cFilt').value;
+  if(button) button.disabled=true;
+  try{
+    await loadCertExcelLibrary();
+    for(const id of ids){await generateExcelCertificate(id,lf,lt,filt);}
+    bulkCertIds=null;
+    close2('certModal');
+    toast(`✓ ${ids.length} archivo(s) Excel generado(s)`,'ok');
+  }catch(error){console.error(error);toast(error.message||'No se pudo generar el Excel','err');}
+  finally{certExcelBusy=false;if(button) button.disabled=false;}
+}
+async function generateExcelCertificate(empId,levelFrom,levelTo,filterMode){
+  const empRows=await ensureEmployeeRows(empId);
+  if(!empRows.length) throw new Error('Sin datos para este empleado');
+  let skills=[...empRows];
+  if(filterMode==='comp') skills=skills.filter(r=>r._s==='comp');
+  else if(filterMode==='compExpir') skills=skills.filter(r=>r._s==='comp'||r._s==='expir');
+  skills.sort((a,b)=>pd(b.df)-pd(a.df));
+  const empName=empRows[0].emp;
+  const supervisor=empRows[0].sup||'—';
+  const workbook=new window.ExcelJS.Workbook();
+  workbook.creator=CU?CU.name:'Barrick Academy';
+  const sheet=workbook.addWorksheet('TRAINING RECORD',{
+    views:[{showGridLines:false}],
+    pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,
+      margins:{left:0.35,right:0.35,top:0.3,bottom:0.3,header:0.1,footer:0.1}}
+  });
+  // Twelve narrow columns permit editable information blocks and the four PDF columns.
+  sheet.columns=Array.from({length:12},()=>({width:8.2}));
+  const fill=color=>({type:'pattern',pattern:'solid',fgColor:{argb:'FF'+color}});
+  function block(row,first,last,value,{bg='FFFFFF',color='132231',size=10,bold=false,height=22,align='left'}={}){
+    if(last>first) sheet.mergeCells(row,first,row,last);
+    const cell=sheet.getCell(row,first);
+    cell.value=String(value==null?'':value);
+    cell.font={name:'Arial',size,bold,color:{argb:'FF'+color}};
+    cell.alignment={vertical:'middle',horizontal:align,wrapText:true,indent:1};
+    cell.fill=fill(bg);
+    sheet.getRow(row).height=Math.max(sheet.getRow(row).height||0,height);
+    return cell;
+  }
+  block(1,1,12,'',{bg:'A39161',height:7});
+  for(let r=2;r<=6;r++) for(let c=1;c<=12;c++) sheet.getCell(r,c).fill=fill('00557E');
+  block(2,1,10,'BARRICK ACADEMY',{bg:'00557E',color:'A39161',bold:true,size:10,height:26});
+  block(3,1,10,'TRAINING RECORD',{bg:'00557E',color:'FFFFFF',bold:true,size:23,height:36});
+  block(4,1,10,'EMPLOYEE CERTIFICATE OF COMPETENCE',{bg:'00557E',color:'DAE5EB',size:10,height:25});
+  sheet.getRow(5).height=10;sheet.getRow(6).height=8;
+  block(7,1,12,'',{bg:'A39161',height:3});
+  sheet.getRow(8).height=14;
+  const label={size:8,bold:true,color:'656565',height:20};
+  block(9,1,6,'EMPLOYEE',label);block(9,7,12,'EMPLOYEE ID',label);
+  block(10,1,6,empName,{bold:true,height:34});block(10,7,12,empId,{bold:true,height:34});
+  block(11,1,6,'SUPERVISOR',label);block(11,7,12,'LEVEL PROGRESSION',label);
+  block(12,1,6,supervisor,{size:9,bold:true,height:34});block(12,7,12,`${levelFrom} > ${levelTo}`,{bold:true,height:34});
+  sheet.getRow(13).height=13;
+  block(14,1,12,'ÚLTIMO ENTRENAMIENTO COMPLETADO',{...label,bg:'F1F5F7'});
+  block(15,1,12,skills.length?skills[0].df:'—',{bg:'F1F5F7',bold:true,size:9});
+  sheet.getRow(16).height=12;
+  const ranges=[[1,2],[3,8],[9,10],[11,12]];
+  ['Skill Code','Skill Name','Date From','Status'].forEach((value,i)=>block(17,...ranges[i],value,{bg:'00557E',color:'FFFFFF',bold:true,size:9,height:25}));
+  const statuses={comp:'Competent',expir:'Expiring Soon',expd:'Expired',prog:'In Progress'};
+  const colors={comp:'51857A',expir:'D4644B',expd:'C62325',prog:'738CB4'};
+  skills.forEach((record,index)=>{
+    const row=18+index;
+    const bg=record._s==='expd'?'FDEFEF':record._s==='expir'?'FCF3EF':index%2?'F8FAFB':'FFFFFF';
+    const height=Math.max(30,Math.ceil(String(record.sn||'').length/48)*14+12,Math.ceil(String(record.sc||'').length/14)*14+12);
+    [record.sc,record.sn,record.df||'—',statuses[record._s]||record._s].forEach((value,i)=>{
+      const cell=block(row,...ranges[i],value,{bg,color:i===0?'A39161':i===3?(colors[record._s]||'132231'):'132231',size:9,bold:i===0||i===3,height,align:i>=2?'center':'left'});
+      cell.border={bottom:{style:'thin',color:{argb:'FFE0E7EB'}}};
+    });
+  });
+  const footer=19+skills.length;
+  const genDate=new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'});
+  block(footer,1,12,`Report generated by: ${CU?CU.name:'—'}`,{size:9,color:'656565'});
+  block(footer+1,1,12,`Date: ${genDate}`,{size:9,color:'656565'});
+  block(footer+2,1,12,`Total competencias: ${skills.length}   |   Source: WFM Employee Skills`,{size:9,color:'656565'});
+  block(footer+4,1,12,'',{bg:'A39161',height:4});
+  sheet.pageSetup.printArea=`A1:L${footer+4}`;
+  sheet.pageSetup.printTitlesRow='17:17';
+  const logo=(await logoToDataURL(LOGO_WHITE_URL))||INLINE_CERT_LOGO;
+  if(logo){
+    // Canvas normalizes supported source image formats to PNG for Excel.
+    const image=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('No se pudo preparar el logo para Excel'));im.src=logo;});
+    const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+    canvas.getContext('2d').drawImage(image,0,0);
+    const logoId=workbook.addImage({base64:canvas.toDataURL('image/png'),extension:'png'});
+    const width=Math.min(80,90*image.naturalWidth/image.naturalHeight);
+    sheet.addImage(logoId,{tl:{col:10.25,row:1.25},ext:{width,height:width*image.naturalHeight/image.naturalWidth},editAs:'oneCell'});
+  }
+  const buffer=await workbook.xlsx.writeBuffer();
+  const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const link=document.createElement('a');link.href=url;
+  link.download=`Cert_${empId}_${empName.replace(/[,\s]+/g,'_')}.xlsx`;
+  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 
 // ══════════════════════════════
